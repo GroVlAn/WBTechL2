@@ -1,0 +1,6 @@
+.idea
+.DS_Store
+/build/
+/database/db/
+/database/pgadmin/
+/logs.txt
