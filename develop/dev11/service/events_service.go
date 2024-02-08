@@ -21,12 +21,20 @@ func NewEventsService() *EventsService {
 }
 
 func (es *EventsService) Create(event core.Event) error {
+	if validate := es.validateEvent(event); validate != nil {
+		return validate
+	}
+
 	Events = append(Events, event)
 
 	return nil
 }
 
 func (es *EventsService) Update(event core.Event) error {
+	if validate := es.validateEvent(event); validate != nil {
+		return validate
+	}
+
 	eventKey := es.foundEvent(event.ID, event.UserID)
 
 	if eventKey == -1 {
@@ -133,4 +141,18 @@ func (es *EventsService) existUser(userID string) bool {
 	}
 
 	return false
+}
+
+func (es *EventsService) validateEvent(event core.Event) error {
+	if event.UserID == "" {
+		return fmt.Errorf("validate: does not have user id")
+	}
+	if event.Text == "" {
+		return fmt.Errorf("validate: text event is empty")
+	}
+	if event.Date.IsZero() {
+		return fmt.Errorf("validate: date is empty")
+	}
+
+	return nil
 }
