@@ -4,24 +4,40 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
 )
 
+/*
+Directories - структура отвечающая за работу с директориями ОС
+curDir   strings.Builder - текущая директория
+backup   string - предыдущая директория - нужна для возврата к ней, если новая не существует
+homePath string - домашняя директория, к воторой вы вошли в программу
+*/
 type Directories struct {
 	curDir   strings.Builder
 	backup   string
 	homePath string
 }
 
+// Stdout - структура отвечающая за вывод в STDOUT
 type Stdout struct{}
 
+// Processes - структура отвечающая за работу с процессами OC
 type Processes struct{}
 
+/*
+Shell - структура - консоль
+dir DirWorker - стуктура, которая может работать с директориями
+std StdWorker - структура, которая может работать с выводом в консоль
+prc PrcWorker - структура, которая может работать с процессами ОС
+*/
 type Shell struct {
 	dir DirWorker
 	std StdWorker
@@ -52,8 +68,13 @@ func NewShell(dir DirWorker, std StdWorker, prc PrcWorker) *Shell {
 	}
 }
 
+/*
+Execute - метод выполняющий текущие команды
+cmdArgs string - текущая строка содержащая набор команд
+*/
 func (sh *Shell) Execute(cmdArgs string) {
 
+	// разделяем строку на отдельные команды
 	cmds := strings.Split(cmdArgs, "|")
 
 	for _, cmd := range cmds {
@@ -64,12 +85,19 @@ func (sh *Shell) Execute(cmdArgs string) {
 		if len(lineParts) > 1 {
 			args = lineParts[1:]
 		}
+		// выполняем команду, передав саму команду и её аргументы
 		sh.executeCommand(cmd, args)
 	}
 
 }
 
+/*
+executeCommand - метод выполняющий конкретную команду
+cmd string - название команды
+args []string - аргументы команды
+*/
 func (sh *Shell) executeCommand(cmd string, args []string) {
+	// определяем по названию команды, какой метод нужно вызвать
 	switch cmd {
 	case "cd":
 		if len(args) == 0 {
@@ -80,9 +108,7 @@ func (sh *Shell) executeCommand(cmd string, args []string) {
 	case "pwd":
 		sh.dir.pwd()
 	case "echo":
-		for _, arg := range args {
-			sh.std.echo(arg)
-		}
+		sh.std.echo(args...)
 	case "kill":
 		for _, arg := range args {
 			err := sh.prc.kill(arg)
@@ -106,6 +132,11 @@ func (sh *Shell) executeCommand(cmd string, args []string) {
 	}
 }
 
+/*
+exec - метод запрашивающий у ОС команду, которую нужно выполнить
+cmd string - название команды
+args []string - аргументы команды
+*/
 func (sh *Shell) exec(cmd string, args []string) error {
 	command, err := exec.Command(cmd, args...).Output()
 
@@ -117,12 +148,18 @@ func (sh *Shell) exec(cmd string, args []string) error {
 	return nil
 }
 
+/*
+changeDir - метод меняющий текущую дерикторию
+dir string - дериктория, куда нужно перейти
+*/
 func (d *Directories) changeDir(dir string) {
+	// если dir пустой, переходим к дериктории с которой начали
 	if len(dir) == 0 {
 		d.curDir.Reset()
 		d.curDir.WriteString(d.homePath)
 		return
 	}
+	// разбиваем новый путь на составляющие
 	parts := strings.Split(dir, "/")
 	isNext := false
 	isResetNotDots := false
@@ -130,10 +167,12 @@ func (d *Directories) changeDir(dir string) {
 	d.backup = d.curDir.String()
 
 	for _, part := range parts {
+		//если текущий кусок пуст, игнорируем его
 		if part == "" {
 			continue
 		}
 		curDir := d.curDir.String()
+		// если кусок равен .. удаляем послуднюю часть текущей директории
 		if part == ".." {
 			lstSlh := strings.LastIndex(curDir, "/")
 
@@ -144,6 +183,8 @@ func (d *Directories) changeDir(dir string) {
 			d.curDir.WriteString(curDir[:lstSlh])
 			continue
 		}
+		// если текущий кусок равен . значит ставим флаг что нужно добавлять к уже текущей директории
+		// иначе сбрасываем текущую директорию
 		if part == "." {
 			isNext = true
 			continue
@@ -151,10 +192,12 @@ func (d *Directories) changeDir(dir string) {
 			d.curDir.Reset()
 			isResetNotDots = true
 		}
+		// иначе прото добавляем к текущей директории новый кусок
 		d.curDir.WriteString("/")
 		d.curDir.WriteString(part)
 	}
 
+	// если текущего пути не существует в ОС, сбрасываем текущую директорию до предыдущей
 	if !d.exist() {
 		fmt.Printf("cd: path %s does not exist\n", d.curDir.String())
 		d.curDir.Reset()
@@ -162,6 +205,7 @@ func (d *Directories) changeDir(dir string) {
 	}
 }
 
+// exist - метод проверяющий директорию на существование
 func (d *Directories) exist() bool {
 	_, err := os.Stat(d.curDir.String())
 
@@ -172,14 +216,94 @@ func (d *Directories) exist() bool {
 	return true
 }
 
+// pwd - метод выводящий в консоль текущую директорию
 func (d *Directories) pwd() {
 	fmt.Println(d.curDir.String())
 }
 
-func (std *Stdout) echo(str string) {
-	fmt.Println(str)
+// echo - метод выводящий в консоль
+func (std *Stdout) echo(strs ...string) {
+	if len(strs) < 1 {
+		return
+	}
+	isAppend := strs[0] == "-a"
+
+	if isAppend {
+		strs = strs[1:]
+	}
+	if len(strs) < 3 || !slices.Contains(strs, ">>") {
+		for _, s := range strs {
+			fmt.Println(s)
+		}
+
+		return
+	}
+
+	path := strs[len(strs)-1]
+	var strRes string
+
+	// если в аргументах есть кавычки, записываем всё что внутри них
+	if slicesHasQuot(strs...) {
+		strRes = strings.Join(strs[:len(strs)-2], " ")
+	}
+
+	strRes = strings.Trim(strRes, "\"")
+
+	// если в аргументах есть кавычки пишем всчё что внутри низ в файл
+	if strRes != "" {
+		err := std.writeToFile(path, strRes, isAppend)
+		if err != nil {
+			fmt.Println(err)
+		}
+		return
+	}
+
+	// иначе пишем все строки с новой строки в файл
+	for i, s := range strs {
+		if i < len(strs)-2 {
+			err := std.writeToFile(path, s+"\n", isAppend)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	}
 }
 
+// writeToFile - метод для записи в файл
+func (std *Stdout) writeToFile(path, str string, isAppend bool) error {
+	flags := os.O_WRONLY | os.O_TRUNC | os.O_CREATE
+
+	if isAppend {
+		flags = os.O_WRONLY | os.O_APPEND | os.O_CREATE
+		str += "\n"
+	}
+
+	file, errF := os.OpenFile(
+		path,
+		flags,
+		0666,
+	)
+
+	defer func(file *os.File) {
+		if err := file.Close(); err != nil {
+			log.Fatalf("write to file: can not close file: %s", err.Error())
+		}
+	}(file)
+
+	if errF != nil {
+		return fmt.Errorf("write to file: %s", errF.Error())
+	}
+
+	_, errW := file.Write([]byte(str))
+
+	if errW != nil {
+		return fmt.Errorf("write to file: %s", errW.Error())
+	}
+
+	return nil
+}
+
+// kill - метод убивающий процесс по его pid
 func (p *Processes) kill(pidStr string) error {
 	pid, errConv := strconv.Atoi(pidStr)
 
@@ -202,6 +326,7 @@ func (p *Processes) kill(pidStr string) error {
 	return nil
 }
 
+// ps - выводим список запущеных процессов
 func (p *Processes) ps(args []string) error {
 	prcs, err := exec.Command("ps", args...).Output()
 
@@ -278,10 +403,24 @@ type DirWorker interface {
 }
 
 type StdWorker interface {
-	echo(str string)
+	echo(str ...string)
 }
 
 type PrcWorker interface {
 	kill(pidStr string) error
 	ps(args []string) error
+}
+
+func slicesHasQuot(strs ...string) bool {
+	if slices.Contains(strs, "\"") {
+		return true
+	}
+
+	for _, str := range strs {
+		if strings.Contains(str, "\"") {
+			return true
+		}
+	}
+
+	return false
 }
