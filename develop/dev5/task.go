@@ -307,6 +307,7 @@ func main() {
 	fmt.Println("empty")
 }
 
+// Collector - интерфейс для структур которые могут отдавать найденые значения + новые
 type Collector interface {
 	Collect(col []string, matched []string, keys []int) ([]string, []int)
 }

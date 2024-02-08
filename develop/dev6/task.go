@@ -9,23 +9,17 @@ import (
 	"strings"
 )
 
+/*
+ConsoleArgs - структура хранящая доступные флаги
+FlgColl map[string]interface{} - мапа хранаящая имя флага: значение
+*/
 type ConsoleArgs struct {
 	FlgColl map[string]interface{}
 }
 
-func (ca *ConsoleArgs) ParseFlags() {
-	f := flag.Int("f", 0, "chose column")
-	d := flag.String("d", "\t", "change delimiter")
-	s := flag.Bool("s", false, "print only line with delimiter")
-
-	flag.Parse()
-
-	ca.FlgColl = make(map[string]interface{}, 8)
-	ca.FlgColl["-f"] = *f
-	ca.FlgColl["-d"] = *d
-	ca.FlgColl["-s"] = *s
-}
-
+/*
+Cut - структура для вывода колонок из файла
+*/
 type Cut struct {
 	ca       *ConsoleArgs
 	filePath string
@@ -37,6 +31,9 @@ func NewCut(ca *ConsoleArgs) *Cut {
 	}
 }
 
+/*
+Cut - метод для получения колоко из файла по разделителю
+*/
 func (c *Cut) Cut() ([][]string, error) {
 	lines, err := c.readFile()
 
@@ -44,17 +41,19 @@ func (c *Cut) Cut() ([][]string, error) {
 		return nil, err
 	}
 
+	// если установле флаг записываем в результирующий слайл строки в казаной колонке
 	if c.ca.FlgColl["-f"].(int) != 0 {
 		numCol := c.ca.FlgColl["-f"].(int) - 1
 		curRes := make([][]string, 0)
 
 		for _, line := range lines {
 			ln := make([]string, 0)
-			for key, item := range line {
-				if key == numCol {
-					ln = append(ln, item)
-				}
+			// если в данной строке нет данной колонки, записываем всю строку
+			if len(line) < numCol+1 {
+				curRes = append(curRes, line)
+				continue
 			}
+			ln = append(ln, line[numCol])
 			if len(ln) > 0 {
 				curRes = append(curRes, ln)
 			}
@@ -68,6 +67,7 @@ func (c *Cut) Cut() ([][]string, error) {
 	return lines, nil
 }
 
+// SetFilePath - получаем путь до файла
 func (c *Cut) SetFilePath() error {
 	args := os.Args
 
@@ -80,11 +80,26 @@ func (c *Cut) SetFilePath() error {
 	return nil
 }
 
+// ParseFlags - метод парсит флаги из консоли
+func (ca *ConsoleArgs) ParseFlags() {
+	f := flag.Int("f", 0, "chose column")
+	d := flag.String("d", "\t", "change delimiter")
+	s := flag.Bool("s", false, "print only line with delimiter")
+
+	flag.Parse()
+
+	ca.FlgColl = make(map[string]interface{}, 8)
+	ca.FlgColl["-f"] = *f
+	ca.FlgColl["-d"] = *d
+	ca.FlgColl["-s"] = *s
+}
+
+// readFile - читаем строки из файла
 func (c *Cut) readFile() ([][]string, error) {
 	file, errFile := os.Open(c.filePath)
+
 	defer func(file *os.File) {
 		if errClose := file.Close(); errClose != nil {
-			panic(errClose)
 			log.Fatal("can not close file")
 		}
 	}(file)
