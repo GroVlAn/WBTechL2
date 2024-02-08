@@ -20,8 +20,10 @@ func NewEventsService() *EventsService {
 	return &EventsService{}
 }
 
-func (es *EventsService) Create(event core.Event) {
+func (es *EventsService) Create(event core.Event) error {
 	Events = append(Events, event)
+
+	return nil
 }
 
 func (es *EventsService) Update(event core.Event) error {
@@ -37,6 +39,10 @@ func (es *EventsService) Update(event core.Event) error {
 }
 
 func (es *EventsService) Delete(evID, userID string) error {
+	if !es.existUser(userID) {
+		return fmt.Errorf("delete: user not exist")
+	}
+
 	eventKey := es.foundEvent(evID, userID)
 
 	if eventKey == -1 {
@@ -49,6 +55,10 @@ func (es *EventsService) Delete(evID, userID string) error {
 }
 
 func (es *EventsService) EventByDay(day time.Time, userID string) ([]core.Event, error) {
+	if !es.existUser(userID) {
+		return nil, fmt.Errorf("delete: user not exist")
+	}
+
 	eventsByDay := make([]core.Event, 0)
 	for _, ev := range Events {
 		if ev.Date == day && ev.UserID == userID {
@@ -64,6 +74,10 @@ func (es *EventsService) EventByDay(day time.Time, userID string) ([]core.Event,
 }
 
 func (es *EventsService) EventByWeek(since time.Time, userID string) ([]core.Event, error) {
+	if !es.existUser(userID) {
+		return nil, fmt.Errorf("delete: user not exist")
+	}
+
 	eventsByWeek := make([]core.Event, 0)
 	forDay := since.AddDate(0, 0, since.Day()+7)
 
@@ -80,6 +94,10 @@ func (es *EventsService) EventByWeek(since time.Time, userID string) ([]core.Eve
 }
 
 func (es *EventsService) EventByMonth(since time.Time, userID string) ([]core.Event, error) {
+	if !es.existUser(userID) {
+		return nil, fmt.Errorf("delete: user not exist")
+	}
+
 	eventsByWeek := make([]core.Event, 0)
 	forDay := since.AddDate(0, int(since.Month())+30, 0)
 
@@ -105,4 +123,14 @@ func (es *EventsService) foundEvent(id, userID string) int {
 	}
 
 	return eventKey
+}
+
+func (es *EventsService) existUser(userID string) bool {
+	for _, user := range Users {
+		if user.ID == userID {
+			return true
+		}
+	}
+
+	return false
 }

@@ -35,7 +35,7 @@ func (hh *HTTPHandler) handle(path string, hf http.HandlerFunc) {
 }
 
 type EventServ interface {
-	Create(event core.Event)
+	Create(event core.Event) error
 	Update(event core.Event) error
 	Delete(evID, userID string) error
 	EventByDay(day time.Time, userID string) ([]core.Event, error)
