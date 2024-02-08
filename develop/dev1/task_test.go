@@ -10,7 +10,7 @@ func TestClock(t *testing.T) {
 	_ = clock.Update()
 	timeNow := time.Now().Format(timeFormat)
 
-	if timeNow != clock.GetFormattedTime() {
+	if timeNow != clock.FormattedTime() {
 		t.Error("it's not correct now time")
 	}
 }
