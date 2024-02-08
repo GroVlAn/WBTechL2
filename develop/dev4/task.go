@@ -7,7 +7,9 @@ import (
 	"strings"
 )
 
-func groupAnagram(strs []string) map[string][]string {
+// GroupAnagram - функция для группировки анаграмм
+func GroupAnagram(strs []string) map[string][]string {
+	// мапа где ключ это отсортированые символы в строке, а значение сама строка
 	m := make(map[string][]string)
 	for _, str := range strs {
 		b := []byte(strings.ToLower(str))
@@ -19,6 +21,8 @@ func groupAnagram(strs []string) map[string][]string {
 			m[string(b)] = append(m[string(b)], strings.ToLower(str))
 		}
 	}
+
+	// мапа где ключ это первый элемент множества анаграмм, а значение слайс анаграм
 	res := make(map[string][]string, len(m))
 
 	for _, val := range m {
@@ -33,7 +37,7 @@ func groupAnagram(strs []string) map[string][]string {
 }
 
 func main() {
-	fmt.Println(groupAnagram([]string{
+	fmt.Println(GroupAnagram([]string{
 		"Тяпка",
 		"пятак",
 		"пятак",
