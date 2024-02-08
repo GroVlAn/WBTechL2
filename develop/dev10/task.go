@@ -1,4 +1,4 @@
-package dev10
+package main
 
 import (
 	"flag"
@@ -12,23 +12,6 @@ import (
 	"time"
 )
 
-func copyTo(gracefulShutdown chan os.Signal, dst io.Writer, src io.Reader) {
-	if _, err := io.Copy(dst, src); err != nil {
-		log.Println(err)
-		gracefulShutdown <- os.Interrupt
-	}
-}
-
-func buildAddress(args []string) string {
-	var b strings.Builder
-
-	b.WriteString(args[0])
-	b.WriteString(":")
-	b.WriteString(args[1])
-
-	return b.String()
-}
-
 func main() {
 	fTimeout := flag.Int("t", 10, "Connection end time in seconds")
 	flag.Parse()
@@ -37,7 +20,7 @@ func main() {
 	if len(args) < 2 {
 		log.Fatal("error: empty ip and port")
 	}
-
+	// Создаем TCP-соединение
 	addr := buildAddress(args)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -58,10 +41,27 @@ func main() {
 		<-time.After(time.Duration(*fTimeout) * time.Second)
 		gracefulShutdown <- os.Interrupt
 	}()
-
-	go copyTo(gracefulShutdown, os.Stdout, conn)
-	go copyTo(gracefulShutdown, conn, os.Stdin)
+	// Общение клиента с сервером
+	go copyTo(gracefulShutdown, os.Stdout, conn) // читаем из сокета
+	go copyTo(gracefulShutdown, conn, os.Stdin)  // пишем в сокет
 
 	<-gracefulShutdown
 	log.Println("connection was closed")
+}
+
+func copyTo(gracefulShutdown chan os.Signal, dst io.Writer, src io.Reader) {
+	if _, err := io.Copy(dst, src); err != nil {
+		log.Println(err)
+		gracefulShutdown <- os.Interrupt
+	}
+}
+
+func buildAddress(args []string) string {
+	var b strings.Builder
+
+	b.WriteString(args[0])
+	b.WriteString(":")
+	b.WriteString(args[1])
+
+	return b.String()
 }
